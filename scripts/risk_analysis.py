@@ -55,11 +55,10 @@ def calculate_risk_ratings(input_file):
     liable_cols = ['Liable Party Name']
     liable_risk = process_group('Liable Parties', liable_cols)
    
-    # Generate timestamped filename
+    # Save results to Excel
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     output_file = f'data/risk_ratings_{timestamp}.xlsx'
     
-    # Save results to Excel with timestamp
     with pd.ExcelWriter(output_file) as writer:
         if not route_risk.empty:
             route_risk.to_excel(writer, sheet_name='Route Risk Ratings', index=False)

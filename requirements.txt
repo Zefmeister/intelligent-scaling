@@ -3,3 +3,6 @@ pandas>=1.5.0
 geopy>=2.3.0
 openpyxl>=3.1.0
 scikit-learn>=1.0.0
+openrouteservice==2.3.3
+shapely>=2.0.1; platform_system=="Windows"
+python-dotenv==1.0.0
