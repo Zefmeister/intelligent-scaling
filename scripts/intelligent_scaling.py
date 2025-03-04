@@ -9,10 +9,10 @@ from isochrone_utils import get_isochrone, find_scales_in_isochrone
 
 # --- Constants & Configurations ---
 CAT_SCALE_COST = 14.0              # Fixed cost for weighing at a cat scale
-DRIVER_COST_PER_HOUR = 17.0          # Example driver pay rate per hour
-VIOLATION_COST = 500.0               # Base cost of an overweight violation
-OUT_OF_RANGE_MILE_COST = 2.0         # Cost per extra mile off the main route
-AVERAGE_SPEED_MPH = 50.0             # Assumed average speed in mph
+DRIVER_BASE_HOURLY = 17.0          # Base hourly rate for all driving
+DRIVER_DIRECT_MILE_BONUS = 0.50    # Additional pay per mile on direct route
+DRIVER_DETOUR_MILE_BONUS = 0.25    # Additional pay per mile when out of route
+AVERAGE_SPEED_MPH = 50.0           # Assumed average speed in mph
 
 # --- Load Cat Scale Data ---
 try:
@@ -77,32 +77,41 @@ def get_coordinates(location_str):
         return None
 
 def calculate_detour_cost(ship_from_coords, ship_to_coords, cat_scale_coords):
-    """Calculate detour costs, returning both total cost and driver time cost separately"""
-    # Debug coordinate inputs
-    print("\nCoordinate Validation:")
-    print(f"Ship from: {ship_from_coords}")
-    print(f"Ship to: {ship_to_coords}")
-    print(f"Scale: {cat_scale_coords}")
-    
-    # Calculate distances with explicit coordinate order (lat, lon)
+    """Calculate detour costs with combined hourly and per-mile rates"""
+    # Calculate distances
     direct_route = geodesic(ship_from_coords, ship_to_coords).miles
     to_scale = geodesic(ship_from_coords, cat_scale_coords).miles
     from_scale = geodesic(cat_scale_coords, ship_to_coords).miles
     
-    # Calculate total route with scale
+    # Calculate route with scale and detour distance
     route_with_scale = to_scale + from_scale
     detour_distance = route_with_scale - direct_route
+    
+    # Calculate times (in hours)
+    direct_time = direct_route / AVERAGE_SPEED_MPH
     detour_time = detour_distance / AVERAGE_SPEED_MPH
-    driver_time_cost = detour_time * DRIVER_COST_PER_HOUR
-    total_detour_cost = driver_time_cost + CAT_SCALE_COST
+    total_time = direct_time + detour_time
+    
+    # Calculate pay components for detour only
+    detour_hourly_pay = detour_time * DRIVER_BASE_HOURLY  # Pay for extra time
+    detour_mileage_bonus = detour_distance * DRIVER_DETOUR_MILE_BONUS  # Bonus for extra miles
+    
+    # Total detour cost includes hourly pay, mileage bonus, and scale fee
+    total_detour_cost = detour_hourly_pay + detour_mileage_bonus + CAT_SCALE_COST
     
     # Detailed debug output
-    print(f"\nCost Breakdown:")
-    print(f"Driver time cost (${DRIVER_COST_PER_HOUR}/hr * {detour_time:.2f}hr): ${driver_time_cost:.2f}")
-    print(f"Scale fee: ${CAT_SCALE_COST:.2f}")
-    print(f"Total cost: ${total_detour_cost:.2f}")
+    print(f"\nDetailed Cost Breakdown:")
+    print(f"Direct route: {direct_route:.2f} miles ({direct_time:.2f} hours)")
+    print(f"Detour stats:")
+    print(f"- Additional distance: {detour_distance:.2f} miles")
+    print(f"- Additional time: {detour_time:.2f} hours")
+    print(f"Cost components:")
+    print(f"- Hourly pay: {detour_time:.2f} hrs * ${DRIVER_BASE_HOURLY}/hr = ${detour_hourly_pay:.2f}")
+    print(f"- Mileage bonus: {detour_distance:.2f} mi * ${DRIVER_DETOUR_MILE_BONUS}/mi = ${detour_mileage_bonus:.2f}")
+    print(f"- Scale fee: ${CAT_SCALE_COST:.2f}")
+    print(f"Total detour cost: ${total_detour_cost:.2f}")
     
-    return total_detour_cost, detour_distance, driver_time_cost
+    return total_detour_cost, detour_distance, detour_hourly_pay, detour_time
 
 def calculate_path_deviation(point_coords, from_coords, to_coords):
     """Calculate how far a point deviates from the direct route path"""
@@ -110,8 +119,8 @@ def calculate_path_deviation(point_coords, from_coords, to_coords):
     via_point_distance = geodesic(from_coords, point_coords).miles + geodesic(point_coords, to_coords).miles
     return (via_point_distance - route_distance) / route_distance  # Returns percentage deviation
 
-def find_best_cat_scale(ship_from_coords, ship_to_coords, route_risk=0.0):
-    """Find the optimal cat scale location considering route corridor"""
+def find_best_cat_scale(ship_from_coords, ship_to_coords, route_risk=0.0, origin_state=None):
+    """Find the optimal cat scale location considering route corridor and state"""
     total_distance = geodesic(ship_from_coords, ship_to_coords).miles
     max_deviation = 0.15  # Allow 15% path deviation
     
@@ -121,26 +130,41 @@ def find_best_cat_scale(ship_from_coords, ship_to_coords, route_risk=0.0):
     elif total_distance > 1000:
         max_deviation = 0.25
     
+    # First try to find scales in the same state
+    state_scales = cat_scales[cat_scales['State'] == origin_state] if origin_state else cat_scales
+    
     # Find all scales within reasonable deviation from route
     viable_scales = []
-    for _, scale in cat_scales.iterrows():
+    for _, scale in state_scales.iterrows():
         scale_coords = (scale['Latitude'], scale['Longitude'])
         deviation = calculate_path_deviation(scale_coords, ship_from_coords, ship_to_coords)
         
         if deviation <= max_deviation:
-            detour_cost, extra_distance, driver_time_cost = calculate_detour_cost(
+            detour_cost, extra_distance, driver_pay, detour_time = calculate_detour_cost(
                 ship_from_coords, ship_to_coords, scale_coords
             )
+            from_origin_dist = geodesic(ship_from_coords, scale_coords).miles
+            
+            print(f"\nEvaluating scale in {scale['State']}: {scale['TruckstopName']} - {scale['InterstateCity']}")
+            print(f"Distance from origin: {from_origin_dist:.1f} miles")
+            
             viable_scales.append({
                 'scale': scale,
                 'deviation': deviation,
                 'detour_cost': detour_cost,
                 'distance': extra_distance,
-                'from_origin': geodesic(ship_from_coords, scale_coords).miles
+                'detour_time': detour_time,
+                'driver_pay': driver_pay,
+                'from_origin': from_origin_dist
             })
     
+    # If no viable scales in same state, try all states
+    if not viable_scales and origin_state:
+        print(f"\nNo viable scales found in {origin_state}, checking all states...")
+        return find_best_cat_scale(ship_from_coords, ship_to_coords, route_risk, None)
+    
     if not viable_scales:
-        return "No suitable scale found", float('inf'), None, None
+        return "No suitable scale found", float('inf'), None, None, None, None
     
     # Sort scales by a combination of factors
     for scale in viable_scales:
@@ -156,7 +180,7 @@ def find_best_cat_scale(ship_from_coords, ship_to_coords, route_risk=0.0):
     scale_data = best_scale['scale']
     
     # Calculate final costs for best scale
-    final_detour_cost, _, final_driver_time_cost = calculate_detour_cost(
+    final_detour_cost, final_detour_distance, final_driver_pay, final_detour_time = calculate_detour_cost(
         ship_from_coords, ship_to_coords,
         (scale_data['Latitude'], scale_data['Longitude'])
     )
@@ -165,7 +189,9 @@ def find_best_cat_scale(ship_from_coords, ship_to_coords, route_risk=0.0):
         f"{scale_data['TruckstopName']} - {scale_data['InterstateCity']}, {scale_data['State']} (#{scale_data['CATScaleNumber']})",
         final_detour_cost,
         (scale_data['Latitude'], scale_data['Longitude']),
-        final_driver_time_cost
+        final_driver_pay,
+        final_detour_time,
+        final_detour_distance
     )
 
 def compute_historical_risk_premium(liable_party):
@@ -217,8 +243,8 @@ if st.button("Analyze Risk"):
             )
             
             # Find the optimal cat scale along the route
-            best_scale, detour_cost, scale_coords, driver_time_cost = find_best_cat_scale(
-                ship_from_coords, ship_to_coords, route_risk
+            best_scale, detour_cost, scale_coords, driver_pay, detour_time, detour_distance = find_best_cat_scale(
+                ship_from_coords, ship_to_coords, route_risk, ship_from_state
             )
             
             # Get recommendation
@@ -250,7 +276,7 @@ if st.button("Analyze Risk"):
                     
                     if loss_coords:
                         # Calculate historical detour cost
-                        historical_detour_cost, historical_distance, historical_driver_cost = calculate_detour_cost(
+                        historical_detour_cost, historical_distance, historical_driver_pay, historical_detour_time = calculate_detour_cost(
                             ship_from_coords, ship_to_coords, loss_coords
                         )
                         
@@ -262,13 +288,12 @@ if st.button("Analyze Risk"):
                         
                         st.write("\n**Historical Comparison:**")
                         st.write(f"- Historical scale location: {loss_city}, {loss_state}")
-                        st.write(f"- Historical detour cost breakdown:")
-                        st.write(f"  - Driver time: ${historical_driver_cost:.2f}")
+                        st.write(f"  - Historical Driver cost (time + mileage): ${historical_driver_pay:.2f}")
                         st.write(f"  - Scale fee: ${CAT_SCALE_COST:.2f}")
                         st.write(f"  - Total cost: ${historical_detour_cost:.2f}")
                         
-                        if scale_data.empty:
-                            st.write("Note: Historical location is not a registered CAT scale")
+                        #if scale_data.empty:
+                        #    st.write("Note: Historical location is not a registered CAT scale")
                         
                         savings = historical_detour_cost - detour_cost
                         if savings > 0:
@@ -282,7 +307,8 @@ if st.button("Analyze Risk"):
                 st.write(f"- Direct route: {direct_route:.1f} miles")
                 st.write(f"- Distance to scale: {to_scale:.1f} miles")
                 st.write(f"- Additional cost breakdown:")
-                st.write(f"  - Driver time: ${driver_time_cost:.2f}")  # Use actual driver time cost
+                st.write(f"  - Base hourly pay: ({detour_time:.3f} hrs) × (${DRIVER_BASE_HOURLY:.2f}/hr) = ${detour_time * DRIVER_BASE_HOURLY:.2f}")
+                st.write(f"  - Detour mile bonus: ({detour_distance:.1f} miles) × (${DRIVER_DETOUR_MILE_BONUS:.2f}/mile) = ${detour_distance * DRIVER_DETOUR_MILE_BONUS:.2f}")
                 st.write(f"  - Scale fee: ${CAT_SCALE_COST:.2f}")
                 st.write(f"  - **Total detour cost:** ${detour_cost:.2f}")
                 

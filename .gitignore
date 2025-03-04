@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
 build/
 develop-eggs/
 dist/
@@ -15,64 +16,32 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # Virtual Environment
-.env
-.venv
-env/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
-Include/
-Lib/
-Scripts/
-pyvenv.cfg
-*.cfg
-pip-log.txt
-pip-delete-this-directory.txt
+.env
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-.project
-.pydevproject
-.settings
 
-# Data directories and files
-data/
-datasets/
-raw_data/
-processed_data/
-*.xlsx
-*.xls
-*.xlsm
-*.xlsb
-*.csv
-*.json
-*.parquet
-*.feather
-*.pkl
-*.db
-*.sqlite*
+# Project specific
+data/latest_risk_ratings.txt
+data/risk_ratings_*.xlsx
+debug.log
 
-# Logs and local config
-*.log
-.env
+# Streamlit
 .streamlit/
-local_settings.py
 
-# OS specific
+# Misc
 .DS_Store
 Thumbs.db
-*.lnk
-Desktop.ini
-$RECYCLE.BIN/
-venv/Lib/site-packages/numpy-2.2.3-cp312-cp312-win_amd64.whl
+data/Cargo_claims_data.xlsx
+data/cat_scales.xlsx
