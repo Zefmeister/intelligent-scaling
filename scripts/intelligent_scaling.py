@@ -10,8 +10,8 @@ from isochrone_utils import get_isochrone, find_scales_in_isochrone
 # --- Constants & Configurations ---
 CAT_SCALE_COST = 14.0              # Fixed cost for weighing at a cat scale
 DRIVER_BASE_HOURLY = 17.0          # Base hourly rate for all driving
-DRIVER_DIRECT_MILE_BONUS = 0.50    # Additional pay per mile on direct route
-DRIVER_DETOUR_MILE_BONUS = 0.25    # Additional pay per mile when out of route
+DRIVER_DIRECT_MILE_BONUS = 0.50    # Additional pay per mile on direct route #remove
+DRIVER_DETOUR_MILE_BONUS = 0.25    # Additional pay per mile when out of route #remove
 AVERAGE_SPEED_MPH = 50.0           # Assumed average speed in mph
 
 # --- Load Cat Scale Data ---
