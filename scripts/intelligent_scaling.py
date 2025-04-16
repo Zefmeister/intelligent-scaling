@@ -6,6 +6,8 @@ from risk_utils import calculate_route_risk, calculate_liable_party_risk, get_ri
 import os
 from datetime import datetime
 from isochrone_utils import get_isochrone, find_scales_in_isochrone
+from map_utils import create_route_map
+from streamlit_folium import folium_static
 
 # --- Constants & Configurations ---
 CAT_SCALE_COST = 14.0              # Fixed cost for weighing at a cat scale
@@ -230,6 +232,32 @@ if st.button("Analyze Risk"):
         if ship_from_coords is None or ship_to_coords is None:
             st.error("Could not determine coordinates for one of the provided locations.")
         else:
+            # Get historical data before maps
+            historical_scale = None
+            historical_data = incident_data[
+                (incident_data['Ship From City'].str.upper() == ship_from_city.upper()) &
+                (incident_data['Ship From State'].str.upper() == ship_from_state.upper()) &
+                (incident_data['Ship To City'].str.upper() == ship_to_city.upper()) &
+                (incident_data['Ship To State'].str.upper() == ship_to_state.upper())
+            ]
+            
+            if not historical_data.empty:
+                loss_city = historical_data.iloc[0]['Loss City']
+                loss_state = historical_data.iloc[0]['Loss State']
+                loss_loc = f"{loss_city}, {loss_state}"
+                loss_coords = get_coordinates(loss_loc)
+                if loss_coords:
+                    historical_scale = (loss_coords, loss_city, loss_state)
+
+            # Show initial historical analysis map
+            base_map = create_route_map(
+                ship_from_coords, 
+                ship_to_coords,
+                historical_scale=historical_scale
+            )
+            st.write("**Historical Analysis Map:**")
+            folium_static(base_map)
+            
             # Calculate risk scores
             route_risk, route_rating = calculate_route_risk(
                 ship_from_city, ship_from_state, 
@@ -252,13 +280,22 @@ if st.button("Analyze Risk"):
                 route_risk, liable_risk, detour_cost
             )
             
-            # Display results with more detail
-            st.write(f"**Route Risk Rating:** {route_rating} ({route_risk:.2f})")
-            st.write(f"**Liable Party Risk Rating:** {liable_rating} ({liable_risk:.2f})")
-            st.write(f"**Scale Details:**")
-            
-            # After finding best scale, add historical comparison
+            # After finding best scale, update map with recommendation
             if should_scale:
+                isochrone = get_isochrone(ship_from_coords)
+                scales_nearby = find_scales_in_isochrone(isochrone, cat_scales)
+                
+                updated_map = create_route_map(
+                    ship_from_coords,
+                    ship_to_coords,
+                    scale_coords,
+                    isochrone,
+                    scales_nearby,
+                    historical_scale
+                )
+                st.write("**Route Analysis Map:**")
+                folium_static(updated_map)
+                
                 # Find historical loss location for this route
                 historical_data = incident_data[
                     (incident_data['Ship From City'].str.upper() == ship_from_city.upper()) &
