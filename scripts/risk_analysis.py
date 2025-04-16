@@ -33,6 +33,21 @@ def calculate_risk_ratings(input_file):
         if len(grouped) == 0:
             return pd.DataFrame()
        
+        # For route risk, add most common liable party
+        if group_by == 'Routes':
+            # Group by route and liable party to find frequency
+            liable_party_counts = filtered_df.groupby(
+                group_cols + ['Liable Party Name']
+            ).size().reset_index(name='frequency')
+            
+            # Get the most frequent liable party for each route
+            most_common_liable = liable_party_counts.sort_values('frequency', ascending=False).groupby(
+                group_cols
+            )['Liable Party Name'].first().reset_index()
+            
+            # Merge with main grouped dataframe
+            grouped = grouped.merge(most_common_liable, on=group_cols, how='left')
+       
         # Normalize metrics
         scaler = MinMaxScaler()
         metrics = grouped[['incident_count', 'total_penalties']]
