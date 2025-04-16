@@ -305,10 +305,10 @@ if st.button("Analyze Risk"):
                 direct_route = geodesic(ship_from_coords, ship_to_coords).miles
                 to_scale = geodesic(ship_from_coords, scale_coords).miles
                 st.write(f"- Direct route: {direct_route:.1f} miles")
-                st.write(f"- Distance to scale: {to_scale:.1f} miles")
-                st.write(f"- Additional cost breakdown:")
-                st.write(f"  - Base hourly pay: ({detour_time:.3f} hrs) × (${DRIVER_BASE_HOURLY:.2f}/hr) = ${detour_time * DRIVER_BASE_HOURLY:.2f}")
-                st.write(f"  - Detour mile bonus: ({detour_distance:.1f} miles) × (${DRIVER_DETOUR_MILE_BONUS:.2f}/mile) = ${detour_distance * DRIVER_DETOUR_MILE_BONUS:.2f}")
+                #st.write(f"- Distance to scale: {to_scale:.1f} miles")
+                #st.write(f"- Additional cost breakdown:")
+                #st.write(f"  - Base hourly pay: ({detour_time:.3f} hrs) × (${DRIVER_BASE_HOURLY:.2f}/hr) = ${detour_time * DRIVER_BASE_HOURLY:.2f}")
+                #st.write(f"  - Detour mile bonus: ({detour_distance:.1f} miles) × (${DRIVER_DETOUR_MILE_BONUS:.2f}/mile) = ${detour_distance * DRIVER_DETOUR_MILE_BONUS:.2f}")
                 st.write(f"  - Scale fee: ${CAT_SCALE_COST:.2f}")
                 st.write(f"  - **Total detour cost:** ${detour_cost:.2f}")
                 
