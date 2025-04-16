@@ -44,4 +44,3 @@ debug.log
 .DS_Store
 Thumbs.db
 data/Cargo_claims_data.xlsx
-data/cat_scales.xlsx
